@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suppliers</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-supplier">
+  <header>
+    <h1>🚚 Suppliers & Supplied Items</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>🔐 Owner Authentication</h2>
+      <div class="form-group">
+        <label>Owner Password (for add/update/delete)</label>
+        <input id="ownerPwd" type="password" placeholder="Enter owner password" oninput="ownerPassword = this.value">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>➕ Add Supplier</h2>
+      <form id="addSupplierForm" onsubmit="event.preventDefault(); addSupplier();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name *</label>
+            <input id="supName" placeholder="Supplier name" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input id="supPhone" type="tel" placeholder="Phone number">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input id="supEmail" type="email" placeholder="Email address">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <textarea id="supAddress" placeholder="Complete address" rows="2"></textarea>
+        </div>
+        <button type="submit">Add Supplier</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">🚚 Suppliers</h2>
+        <button onclick="loadSuppliers()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div class="search-box">
+        <input type="text" id="searchSupplier" placeholder="Search suppliers..." onkeyup="filterSuppliers()">
+      </div>
+
+      <div id="suppliersContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading suppliers...</span>
+        </div>
+      </div>
+
+      <table id="supTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div id="emptySuppliers" class="empty-state hidden">
+        <div class="empty-state-icon">🚚</div>
+        <div class="empty-state-text">No suppliers found</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔗 Link Supplier → Medicine</h2>
+      <form id="linkForm" onsubmit="event.preventDefault(); linkSupplierItem();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Supplier *</label>
+            <select id="linkSupplier" required></select>
+          </div>
+          <div class="form-group">
+            <label>Medicine *</label>
+            <select id="linkItem" required></select>
+          </div>
+          <div class="form-group">
+            <label>Supply Price (₹) *</label>
+            <input id="linkPrice" type="number" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+        </div>
+        <button type="submit">Link Supplier & Medicine</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📦 Items Supplied By Supplier</h2>
+        <span id="selectedSupplierInfo" class="badge badge-info">No supplier selected</span>
+      </div>
+
+      <div class="form-group">
+        <label>Select Supplier to View Items</label>
+        <select id="viewSupplierSelect" onchange="showSupplied(this.value)">
+          <option value="">-- Select Supplier --</option>
+        </select>
+      </div>
+
+      <div id="suppliedContainer">
+        <div class="empty-state">
+          <div class="empty-state-icon">📦</div>
+          <div class="empty-state-text">Select a supplier to view supplied items</div>
+        </div>
+      </div>
+
+      <table id="suppliedTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Link ID</th>
+            <th>Item</th>
+            <th>Stock</th>
+            <th>Supply Price</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+    let ownerPassword = null;
+    let allSuppliers = [];
+    let allMedicines = [];
+
+    document.getElementById('ownerPwd').addEventListener('input', e => ownerPassword = e.target.value);
+
+    async function loadSuppliers() {
+      const container = document.getElementById('suppliersContainer');
+      // show skeleton while loading
+      showSkeletonLoader(container);
+      try {
+        const res = await fetch(base + '/api/suppliers');
+        allSuppliers = await res.json();
+        displaySuppliers(allSuppliers);
+        updateSupplierSelects(allSuppliers);
+      } catch (error) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-text">Error loading suppliers</div></div>';
+        showToast('Error loading suppliers', 'error');
+      }
+    }
+
+    function displaySuppliers(suppliers) {
+      const container = document.getElementById('suppliersContainer');
+      const table = document.getElementById('supTable');
+      const emptyState = document.getElementById('emptySuppliers');
+      const tbody = table.querySelector('tbody');
+
+      if (!suppliers || suppliers.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = suppliers.map(s => {
+        const initials = (s.Name || 'S').split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
+        return `
+        <tr>
+          <td><strong>#${s.SupplierID}</strong></td>
+          <td>
+            <div class="flex" style="align-items:center">
+              <div class="avatar">${initials}</div>
+              <div><strong>${escapeHtml(s.Name)}</strong></div>
+            </div>
+          </td>
+          <td>${escapeHtml(s.Phone || 'N/A')}</td>
+          <td>${escapeHtml(s.Email || 'N/A')}</td>
+          <td>${escapeHtml(s.Address || 'N/A')}</td>
+          <td>
+            <div class="table-actions">
+              <button onclick="editSupplier(${s.SupplierID}, '${escapeHtml(s.Name)}', '${escapeHtml(s.Address || '')}', '${s.Phone || ''}', '${s.Email || ''}')" class="btn-sm btn-secondary">Edit</button>
+              <button onclick="deleteSupplier(${s.SupplierID})" class="btn-sm btn-danger">Delete</button>
+              <button onclick="showSupplied(${s.SupplierID})" class="btn-sm">View Items</button>
+            </div>
+          </td>
+        </tr>
+      `}).join('');
+    }
+
+    function updateSupplierSelects(suppliers) {
+      const linkSelect = document.getElementById('linkSupplier');
+      const viewSelect = document.getElementById('viewSupplierSelect');
+      
+      linkSelect.innerHTML = '<option value="">-- Select Supplier --</option>' + 
+        suppliers.map(s => `<option value="${s.SupplierID}">${s.Name}</option>`).join('');
+      
+      viewSelect.innerHTML = '<option value="">-- Select Supplier --</option>' + 
+        suppliers.map(s => `<option value="${s.SupplierID}">${s.Name}</option>`).join('');
+    }
+
+    function filterSuppliers() {
+      const searchTerm = document.getElementById('searchSupplier').value.toLowerCase();
+      const filtered = allSuppliers.filter(s => 
+        s.Name.toLowerCase().includes(searchTerm) ||
+        (s.Phone && s.Phone.includes(searchTerm)) ||
+        (s.Email && s.Email.toLowerCase().includes(searchTerm))
+      );
+      displaySuppliers(filtered);
+    }
+
+    async function loadItemsForLink() {
+      try {
+        const res = await fetch(base + '/api/medicines');
+        allMedicines = await res.json();
+        const select = document.getElementById('linkItem');
+        select.innerHTML = '<option value="">-- Select Medicine --</option>' + 
+          allMedicines.map(i => `<option value="${i.ItemID}">${i.Name} (Stock: ${i.StockQty}, Price: ₹${parseFloat(i.Price || 0).toFixed(2)})</option>`).join('');
+      } catch (error) {
+        showToast('Error loading medicines', 'error');
+      }
+    }
+
+    async function addSupplier() {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      const form = document.getElementById('addSupplierForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const formData = {
+        Name: document.getElementById('supName').value.trim(),
+        Phone: document.getElementById('supPhone').value.trim(),
+        Email: document.getElementById('supEmail').value.trim(),
+        Address: document.getElementById('supAddress').value.trim(),
+        password: ownerPassword
+      };
+
+      const validation = validateForm(formData, ['Name']);
+      if (!validation.isValid) {
+        showToast(validation.errors[0], 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/suppliers', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(formData)
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Supplier added successfully', 'success');
+          form.reset();
+          loadSuppliers();
+        }
+      } catch (error) {
+        showToast('Error adding supplier', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function editSupplier(id, name, address, phone, email) {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      const modalContent = `
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>Edit Supplier</h3>
+            <button class="modal-close">×</button>
+          </div>
+          <div class="modal-body">
+            <form id="modalEditSupplierForm">
+              <div class="form-group">
+                <label>Name *</label>
+                <input id="modalSupName" name="Name" required value="${escapeHtml(name)}">
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input id="modalSupPhone" name="Phone" value="${escapeHtml(phone || '')}">
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input id="modalSupEmail" name="Email" type="email" value="${escapeHtml(email || '')}">
+              </div>
+              <div class="form-group">
+                <label>Address</label>
+                <textarea id="modalSupAddress" name="Address" rows="2">${escapeHtml(address || '')}</textarea>
+              </div>
+              <div class="flex flex-between">
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                <button type="submit" class="btn">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+
+      const modal = new Modal('editSupplierModal', modalContent);
+      modal.open();
+
+      modal.modal.querySelector('.modal-cancel').addEventListener('click', () => modal.close());
+
+      modal.modal.querySelector('#modalEditSupplierForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newName = document.getElementById('modalSupName').value.trim();
+        if (!newName) {
+          showToast('Name is required', 'warning');
+          return;
+        }
+        const newAddress = document.getElementById('modalSupAddress').value.trim();
+        const newPhone = document.getElementById('modalSupPhone').value.trim();
+        const newEmail = document.getElementById('modalSupEmail').value.trim();
+
+        await updateSupplier(id, newName, newAddress, newPhone, newEmail);
+        modal.close();
+      });
+    }
+
+    async function updateSupplier(id, Name, Address, Phone, Email) {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/suppliers/' + id, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ Name, Address, Phone, Email, password: ownerPassword })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Supplier updated successfully', 'success');
+          loadSuppliers();
+        }
+      } catch (error) {
+        showToast('Error updating supplier', 'error');
+      }
+    }
+
+    async function deleteSupplier(id) {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      const modalContent = `
+        <div class="modal-card">
+          <div class="modal-body">
+            <p>Delete supplier? This action cannot be undone.</p>
+            <div class="flex flex-between">
+              <button class="btn btn-secondary modal-cancel">Cancel</button>
+              <button class="btn btn-danger modal-confirm">Delete</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modal = new Modal('deleteSupplierModal', modalContent);
+      modal.open();
+
+      modal.modal.querySelector('.modal-cancel').addEventListener('click', () => modal.close());
+      modal.modal.querySelector('.modal-confirm').addEventListener('click', async () => {
+        try {
+          const res = await fetch(base + '/api/suppliers/' + id, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: ownerPassword })
+          });
+
+          const j = await res.json();
+          if (!res.ok) {
+            showToast('Error: ' + (j.error || 'unknown'), 'error');
+          } else {
+            showToast('Supplier deleted successfully', 'success');
+            loadSuppliers();
+          }
+        } catch (error) {
+          showToast('Error deleting supplier', 'error');
+        } finally {
+          modal.close();
+        }
+      });
+    }
+
+    async function linkSupplierItem() {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      const form = document.getElementById('linkForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const SupplierID = document.getElementById('linkSupplier').value;
+      const ItemID = document.getElementById('linkItem').value;
+      const SupplyPrice = parseFloat(document.getElementById('linkPrice').value || 0);
+
+      if (!SupplierID || !ItemID) {
+        showToast('Please select supplier and medicine', 'warning');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/suppliedby', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ SupplierID, ItemID, SupplyPrice, password: ownerPassword })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Supplier and medicine linked successfully', 'success');
+          form.reset();
+          const supplierName = allSuppliers.find(s => s.SupplierID == SupplierID)?.Name;
+          if (supplierName) {
+            showSupplied(SupplierID);
+          }
+        }
+      } catch (error) {
+        showToast('Error linking supplier and medicine', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function showSupplied(sid) {
+      if (!sid) {
+        document.getElementById('suppliedContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Select a supplier to view supplied items</div></div>';
+        document.getElementById('suppliedTable').classList.add('hidden');
+        document.getElementById('selectedSupplierInfo').textContent = 'No supplier selected';
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/suppliedby/' + sid);
+        const data = await res.json();
+        const container = document.getElementById('suppliedContainer');
+        const table = document.getElementById('suppliedTable');
+        const tbody = table.querySelector('tbody');
+        const supplier = allSuppliers.find(s => s.SupplierID == sid);
+        
+        if (supplier) {
+          document.getElementById('selectedSupplierInfo').textContent = supplier.Name;
+        }
+
+        if (!data || data.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">No items supplied by this supplier</div></div>';
+          table.classList.add('hidden');
+          return;
+        }
+
+        container.innerHTML = '';
+        table.classList.remove('hidden');
+
+        tbody.innerHTML = data.map(r => {
+          const isLowStock = r.StockQty <= 10;
+          const stockBadge = isLowStock ? 
+            `<span class="badge badge-warning">${r.StockQty}</span>` : 
+            `<span class="badge badge-success">${r.StockQty}</span>`;
+
+          return `
+            <tr>
+              <td><strong>#${r.ID}</strong></td>
+              <td><strong>${escapeHtml(r.ItemName || 'Unknown')}</strong></td>
+              <td>${stockBadge}</td>
+              <td>₹${parseFloat(r.SupplyPrice || 0).toFixed(2)}</td>
+              <td>
+                <div class="table-actions">
+                  <button onclick="unlink(${r.ID})" class="btn-sm btn-danger">Unlink</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Update view select
+        document.getElementById('viewSupplierSelect').value = sid;
+      } catch (error) {
+        document.getElementById('suppliedContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading supplied items</div></div>';
+        showToast('Error loading supplied items', 'error');
+      }
+    }
+
+    async function unlink(id) {
+      if (!ownerPassword) {
+        showToast('Owner password required', 'warning');
+        return;
+      }
+
+      const modalContent = `
+        <div class="modal-card">
+          <div class="modal-body">
+            <p>Remove link? This action cannot be undone.</p>
+            <div class="flex flex-between">
+              <button class="btn btn-secondary modal-cancel">Cancel</button>
+              <button class="btn btn-danger modal-confirm">Remove</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const modal = new Modal('unlinkModal', modalContent);
+      modal.open();
+
+      modal.modal.querySelector('.modal-cancel').addEventListener('click', () => modal.close());
+      modal.modal.querySelector('.modal-confirm').addEventListener('click', async () => {
+        try {
+          const res = await fetch(base + '/api/suppliedby/' + id, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: ownerPassword })
+          });
+
+          const j = await res.json();
+          if (!res.ok) {
+            showToast('Error: ' + (j.error || 'unknown'), 'error');
+          } else {
+            showToast('Link removed successfully', 'success');
+            const supplierSelect = document.getElementById('viewSupplierSelect');
+            showSupplied(supplierSelect.value);
+          }
+        } catch (error) {
+          showToast('Error removing link', 'error');
+        } finally {
+          modal.close();
+        }
+      });
+    }
+
+    // Initialize
+    loadSuppliers();
+    loadItemsForLink();
+  </script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billing & Invoices</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-billing">
+  <header>
+    <h1>💳 Billing & Invoices</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>🔍 Search Purchase for Invoice</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Purchase ID</label>
+          <input type="number" id="purchaseIdInput" placeholder="Enter Purchase ID">
+        </div>
+        <div class="form-group">
+          <label>Buyer</label>
+          <select id="buyerFilter"></select>
+        </div>
+        <div class="form-group">
+          <label>Date Range (Start)</label>
+          <input type="date" id="startDateFilter">
+        </div>
+        <div class="form-group">
+          <label>Date Range (End)</label>
+          <input type="date" id="endDateFilter">
+        </div>
+      </div>
+      <button onclick="searchPurchases()">🔍 Search</button>
+      <button onclick="clearSearch()" class="btn-secondary">Clear</button>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📋 Purchase History</h2>
+        <button onclick="loadAllPurchases()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div id="purchasesListContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading purchases...</span>
+        </div>
+      </div>
+
+      <div id="purchasesList" class="purchases-grid hidden"></div>
+    </div>
+
+    <div id="invoiceContainer" class="hidden">
+      <div class="card invoice-card">
+        <div class="invoice-header">
+          <div>
+            <h2>💊 MEDICAL SHOP INVOICE</h2>
+            <p>Invoice #<span id="invoiceNumber"></span></p>
+          </div>
+          <button onclick="printInvoice()" class="btn">🖨️ Print Invoice</button>
+        </div>
+
+        <div class="invoice-body">
+          <div class="invoice-row">
+            <div class="invoice-col">
+              <h3>Bill To:</h3>
+              <p id="billToName"><strong></strong></p>
+              <p id="billToPhone"></p>
+              <p id="billToAddress"></p>
+            </div>
+            <div class="invoice-col">
+              <h3>Invoice Details:</h3>
+              <p><strong>Date:</strong> <span id="invoiceDate"></span></p>
+              <p><strong>Purchase ID:</strong> <span id="invoicePurchaseId"></span></p>
+            </div>
+          </div>
+
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceItems"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" class="text-right"><strong>Total Amount:</strong></td>
+                <td><strong id="invoiceTotal">₹0.00</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="invoice-footer">
+            <p>Thank you for your business! 🎉</p>
+            <p class="text-small">This is a computer-generated invoice.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .purchases-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .purchase-card {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-color);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+
+    .purchase-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .purchase-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .purchase-id {
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+
+    .purchase-date {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .purchase-details {
+      margin-bottom: 0.5rem;
+    }
+
+    .purchase-details strong {
+      color: var(--text-primary);
+    }
+
+    .purchase-total {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 2px solid var(--primary-color);
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+
+    .invoice-card {
+      max-width: 800px;
+      margin: 2rem auto;
+    }
+
+    .invoice-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 3px solid var(--primary-color);
+    }
+
+    .invoice-body {
+      padding: 1.5rem;
+      background: white;
+    }
+
+    .invoice-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .invoice-col h3 {
+      margin-bottom: 0.5rem;
+      color: var(--primary-color);
+    }
+
+    .invoice-table {
+      width: 100%;
+      margin: 2rem 0;
+    }
+
+    .invoice-table th {
+      background: var(--bg-tertiary);
+      text-align: left;
+    }
+
+    .invoice-footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
+    }
+
+    .text-small {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .invoice-card, .invoice-card * {
+        visibility: visible;
+      }
+      .invoice-card {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .invoice-header button {
+        display: none;
+      }
+    }
+  </style>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+
+    async function loadAllPurchases() {
+      try {
+        const res = await fetch(base + '/api/purchases');
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        displayPurchasesList(data || []);
+      } catch (error) {
+        console.error('Error loading purchases:', error);
+        const container = document.getElementById('purchasesListContainer');
+        container.innerHTML = 
+          '<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">Error loading purchases. Please check if the server is running.</div></div>';
+        showToast('Error loading purchases: ' + error.message, 'error');
+      }
+    }
+
+    function displayPurchasesList(purchases) {
+      const container = document.getElementById('purchasesListContainer');
+      const list = document.getElementById('purchasesList');
+
+      if (!purchases || purchases.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No purchases found</div></div>';
+        list.classList.add('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      list.classList.remove('hidden');
+
+      list.innerHTML = purchases.map(p => `
+        <div class="purchase-card" onclick="generateInvoice(${p.PurchaseID})">
+          <div class="purchase-card-header">
+            <span class="purchase-id">#${p.PurchaseID}</span>
+            <span class="purchase-date">${formatDate(p.PurchaseDate)}</span>
+          </div>
+          <div class="purchase-details">
+            <p><strong>Buyer:</strong> ${escapeHtml(p.BuyerName || 'Unknown')}</p>
+            <p><strong>Item:</strong> ${escapeHtml(p.ItemName || 'Unknown')}</p>
+            <p><strong>Quantity:</strong> ${p.Quantity}</p>
+            <p><strong>Price:</strong> ₹${parseFloat(p.Price || 0).toFixed(2)}</p>
+          </div>
+          <div class="purchase-total">
+            Total: ₹${parseFloat(p.TotalAmount || (p.Price || 0) * p.Quantity).toFixed(2)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function searchPurchases() {
+      const purchaseId = document.getElementById('purchaseIdInput').value;
+      const buyerId = document.getElementById('buyerFilter').value;
+      const startDate = document.getElementById('startDateFilter').value;
+      const endDate = document.getElementById('endDateFilter').value;
+
+      if (purchaseId) {
+        await generateInvoice(parseInt(purchaseId));
+        return;
+      }
+
+      let url = base + '/api/purchases?';
+      const params = [];
+      if (buyerId) params.push(`buyerId=${buyerId}`);
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      
+      url += params.join('&');
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        displayPurchasesList(data);
+      } catch (error) {
+        showToast('Error searching purchases', 'error');
+      }
+    }
+
+    function clearSearch() {
+      document.getElementById('purchaseIdInput').value = '';
+      document.getElementById('buyerFilter').value = '';
+      document.getElementById('startDateFilter').value = '';
+      document.getElementById('endDateFilter').value = '';
+      loadAllPurchases();
+    }
+
+    async function generateInvoice(purchaseId) {
+      try {
+        const res = await fetch(base + '/api/purchases/' + purchaseId);
+        if (!res.ok) {
+          throw new Error(`Purchase not found (Status: ${res.status})`);
+        }
+        const purchase = await res.json();
+        if (!purchase) {
+          throw new Error('Purchase data is empty');
+        }
+
+        document.getElementById('invoiceNumber').textContent = purchase.PurchaseID;
+        document.getElementById('invoicePurchaseId').textContent = purchase.PurchaseID;
+        document.getElementById('invoiceDate').textContent = formatDate(purchase.PurchaseDate);
+        
+        document.getElementById('billToName').innerHTML = `<strong>${escapeHtml(purchase.BuyerName || 'Unknown')}</strong>`;
+        document.getElementById('billToPhone').textContent = purchase.BuyerPhone || 'N/A';
+        document.getElementById('billToAddress').textContent = purchase.BuyerAddress || 'N/A';
+
+        const itemsBody = document.getElementById('invoiceItems');
+        itemsBody.innerHTML = `
+          <tr>
+            <td>${escapeHtml(purchase.ItemName || 'Unknown')}</td>
+            <td>${purchase.Quantity}</td>
+            <td>₹${parseFloat(purchase.Price || 0).toFixed(2)}</td>
+            <td>₹${parseFloat(purchase.TotalAmount || (purchase.Price || 0) * purchase.Quantity).toFixed(2)}</td>
+          </tr>
+        `;
+
+        document.getElementById('invoiceTotal').textContent = 
+          `₹${parseFloat(purchase.TotalAmount || (purchase.Price || 0) * purchase.Quantity).toFixed(2)}`;
+
+        document.getElementById('invoiceContainer').classList.remove('hidden');
+        document.getElementById('invoiceContainer').scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        console.error('Error loading invoice:', error);
+        showToast('Error loading invoice: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
+
+    function printInvoice() {
+      window.print();
+    }
+
+    async function loadBuyers() {
+      try {
+        const res = await fetch(base + '/api/buyers');
+        const buyers = await res.json();
+        const select = document.getElementById('buyerFilter');
+        select.innerHTML = '<option value="">All Buyers</option>' + 
+          buyers.map(b => `<option value="${b.BuyerID}">${b.Name}</option>`).join('');
+      } catch (error) {
+        console.error('Error loading buyers:', error);
+      }
+    }
+
+    // Initialize page
+    function initPage() {
+      // Check for URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const purchaseId = urlParams.get('purchaseId');
+      if (purchaseId) {
+        generateInvoice(parseInt(purchaseId));
+      }
+      // Load initial data
+      loadBuyers();
+      loadAllPurchases();
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+      initPage();
+    }
+  </script>
+</body>
+</html>
+

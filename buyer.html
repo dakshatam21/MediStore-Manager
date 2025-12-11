@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buyers</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-buyer">
+  <header>
+    <h1>👥 Buyers Management</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>➕ Add New Buyer</h2>
+      <form id="addBuyerForm" onsubmit="event.preventDefault(); addBuyer();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name *</label>
+            <input id="bName" placeholder="Full name" required>
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input id="bPhone" type="tel" placeholder="Phone number" pattern="[0-9]{10}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <textarea id="bAddress" placeholder="Complete address" rows="2"></textarea>
+        </div>
+        <button type="submit">Add Buyer</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">👥 Existing Buyers</h2>
+        <button onclick="loadBuyers()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div class="search-box">
+        <input type="text" id="searchBuyer" placeholder="Search buyers by name or phone..." onkeyup="filterBuyers()">
+      </div>
+
+      <div id="buyersContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading buyers...</span>
+        </div>
+      </div>
+
+      <table id="buyersTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div id="emptyBuyers" class="empty-state hidden">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-text">No buyers found</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+    let allBuyers = [];
+
+    async function loadBuyers() {
+      try {
+        const res = await fetch(base + '/api/buyers');
+        allBuyers = await res.json();
+        displayBuyers(allBuyers);
+      } catch (error) {
+        document.getElementById('buyersContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading buyers</div></div>';
+        showToast('Error loading buyers', 'error');
+      }
+    }
+
+    function displayBuyers(buyers) {
+      const container = document.getElementById('buyersContainer');
+      const table = document.getElementById('buyersTable');
+      const emptyState = document.getElementById('emptyBuyers');
+      const tbody = table.querySelector('tbody');
+
+      if (!buyers || buyers.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = buyers.map(b => `
+        <tr>
+          <td><strong>#${b.BuyerID}</strong></td>
+          <td><strong>${escapeHtml(b.Name)}</strong></td>
+          <td>${escapeHtml(b.Phone || 'N/A')}</td>
+          <td>${escapeHtml(b.Address || 'N/A')}</td>
+          <td>
+            <div class="table-actions">
+              <button onclick="viewBuyerPurchases(${b.BuyerID})" class="btn-sm btn-secondary">View Purchases</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterBuyers() {
+      const searchTerm = document.getElementById('searchBuyer').value.toLowerCase();
+      const filtered = allBuyers.filter(b => 
+        b.Name.toLowerCase().includes(searchTerm) || 
+        (b.Phone && b.Phone.includes(searchTerm))
+      );
+      displayBuyers(filtered);
+    }
+
+    async function addBuyer() {
+      const form = document.getElementById('addBuyerForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const formData = {
+        Name: document.getElementById('bName').value.trim(),
+        Phone: document.getElementById('bPhone').value.trim(),
+        Address: document.getElementById('bAddress').value.trim()
+      };
+
+      const validation = validateForm(formData, ['Name']);
+      if (!validation.isValid) {
+        showToast(validation.errors[0], 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/buyers', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(formData)
+        });
+
+        const j = await res.json();
+        if (res.ok) {
+          showToast('Buyer added successfully', 'success');
+          form.reset();
+          loadBuyers();
+        } else {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        }
+      } catch (error) {
+        showToast('Error adding buyer', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function viewBuyerPurchases(buyerId) {
+      window.location.href = `purchase.html?buyerId=${buyerId}`;
+    }
+
+    // Initialize
+    loadBuyers();
+  </script>
+</body>
+</html>

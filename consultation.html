@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor - Patient Consultations</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-consultation">
+  <header>
+    <h1>🩺 Consultations Management</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>👨‍⚕️ Doctors</h2>
+      <form id="addDoctorForm" onsubmit="event.preventDefault(); addDoctor();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name *</label>
+            <input id="docName" placeholder="Doctor name" required>
+          </div>
+          <div class="form-group">
+            <label>Specialization</label>
+            <input id="docSpec" placeholder="Specialization">
+          </div>
+          <div class="form-group">
+            <label>Contact</label>
+            <input id="docContact" type="tel" placeholder="Contact number">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input id="docEmail" type="email" placeholder="Email address">
+          </div>
+        </div>
+        <button type="submit">Add Doctor</button>
+      </form>
+
+      <div class="card-header" style="margin-top: 1.5rem;">
+        <h3 class="card-title">Registered Doctors</h3>
+        <button onclick="loadDoctors()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div id="doctorsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading doctors...</span>
+        </div>
+      </div>
+
+      <table id="docTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Specialization</th>
+            <th>Contact</th>
+            <th>Email</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div id="emptyDoctors" class="empty-state hidden">
+        <div class="empty-state-icon">👨‍⚕️</div>
+        <div class="empty-state-text">No doctors found</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🏥 Patients</h2>
+      <form id="addPatientForm" onsubmit="event.preventDefault(); addPatient();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name *</label>
+            <input id="patName" placeholder="Patient name" required>
+          </div>
+          <div class="form-group">
+            <label>Age</label>
+            <input id="patAge" type="number" min="0" max="150" placeholder="Age">
+          </div>
+          <div class="form-group">
+            <label>Contact</label>
+            <input id="patContact" type="tel" placeholder="Contact number">
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input id="patAddress" placeholder="Address">
+          </div>
+        </div>
+        <button type="submit">Add Patient</button>
+      </form>
+
+      <div class="card-header" style="margin-top: 1.5rem;">
+        <h3 class="card-title">Registered Patients</h3>
+        <button onclick="loadPatients()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div id="patientsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading patients...</span>
+        </div>
+      </div>
+
+      <table id="patTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Contact</th>
+            <th>Address</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div id="emptyPatients" class="empty-state hidden">
+        <div class="empty-state-icon">🏥</div>
+        <div class="empty-state-text">No patients found</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🩺 Consultations</h2>
+      <form id="addConsultationForm" onsubmit="event.preventDefault(); addConsultation();">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Doctor *</label>
+            <select id="selDoctor" required></select>
+          </div>
+          <div class="form-group">
+            <label>Patient *</label>
+            <select id="selPatient" required></select>
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input id="consDate" type="date" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Diagnosis</label>
+          <textarea id="consDiag" placeholder="Enter diagnosis details..." rows="3"></textarea>
+        </div>
+        <button type="submit">Add Consultation</button>
+      </form>
+
+      <div class="card-header" style="margin-top: 1.5rem;">
+        <h3 class="card-title">All Consultations</h3>
+        <button onclick="loadConsultations()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div id="consultationsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading consultations...</span>
+        </div>
+      </div>
+
+      <table id="consTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Date</th>
+            <th>Doctor</th>
+            <th>Patient</th>
+            <th>Diagnosis</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div id="emptyConsultations" class="empty-state hidden">
+        <div class="empty-state-icon">🩺</div>
+        <div class="empty-state-text">No consultations found</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+
+    // Set today's date as default
+    document.getElementById('consDate').valueAsDate = new Date();
+
+    // Doctors
+    async function loadDoctors() {
+      try {
+        const res = await fetch(base + '/api/doctors');
+        const data = await res.json();
+        displayDoctors(data);
+        updateDoctorSelect(data);
+      } catch (error) {
+        document.getElementById('doctorsContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading doctors</div></div>';
+        showToast('Error loading doctors', 'error');
+      }
+    }
+
+    function displayDoctors(doctors) {
+      const container = document.getElementById('doctorsContainer');
+      const table = document.getElementById('docTable');
+      const emptyState = document.getElementById('emptyDoctors');
+      const tbody = table.querySelector('tbody');
+
+      if (!doctors || doctors.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = doctors.map(d => `
+        <tr>
+          <td><strong>#${d.DoctorID}</strong></td>
+          <td><strong>${escapeHtml(d.Name)}</strong></td>
+          <td>${escapeHtml(d.Specialization || 'N/A')}</td>
+          <td>${escapeHtml(d.Contact || 'N/A')}</td>
+          <td>${escapeHtml(d.Email || 'N/A')}</td>
+          <td>
+            <div class="table-actions">
+              <button onclick="editDoctor(${d.DoctorID}, '${escapeHtml(d.Name)}', '${escapeHtml(d.Specialization || '')}', '${d.Contact || ''}', '${d.Email || ''}')" class="btn-sm btn-secondary">Edit</button>
+              <button onclick="deleteDoctor(${d.DoctorID})" class="btn-sm btn-danger">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateDoctorSelect(doctors) {
+      const select = document.getElementById('selDoctor');
+      select.innerHTML = '<option value="">-- Select Doctor --</option>' + 
+        doctors.map(d => `<option value="${d.DoctorID}">${d.Name}${d.Specialization ? ' (' + d.Specialization + ')' : ''}</option>`).join('');
+    }
+
+    async function addDoctor() {
+      const form = document.getElementById('addDoctorForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const formData = {
+        Name: document.getElementById('docName').value.trim(),
+        Specialization: document.getElementById('docSpec').value.trim(),
+        Contact: document.getElementById('docContact').value.trim(),
+        Email: document.getElementById('docEmail').value.trim()
+      };
+
+      const validation = validateForm(formData, ['Name']);
+      if (!validation.isValid) {
+        showToast(validation.errors[0], 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/doctors', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(formData)
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Doctor added successfully', 'success');
+          form.reset();
+          loadDoctors();
+        }
+      } catch (error) {
+        showToast('Error adding doctor', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function editDoctor(id, name, spec, contact, email) {
+      const newName = prompt('Name', name);
+      if (!newName) return;
+
+      const newSpec = prompt('Specialization', spec || '') || '';
+      const newContact = prompt('Contact', contact || '') || '';
+      const newEmail = prompt('Email', email || '') || '';
+
+      if (!confirm('Save changes?')) return;
+      updateDoctor(id, newName, newSpec, newContact, newEmail);
+    }
+
+    async function updateDoctor(id, Name, Specialization, Contact, Email) {
+      try {
+        const res = await fetch(base + '/api/doctors/' + id, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ Name, Specialization, Contact, Email })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Doctor updated successfully', 'success');
+          loadDoctors();
+        }
+      } catch (error) {
+        showToast('Error updating doctor', 'error');
+      }
+    }
+
+    async function deleteDoctor(id) {
+      if (!confirm('Delete doctor? This action cannot be undone.')) return;
+
+      try {
+        const res = await fetch(base + '/api/doctors/' + id, {
+          method: 'DELETE'
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Doctor deleted successfully', 'success');
+          loadDoctors();
+        }
+      } catch (error) {
+        showToast('Error deleting doctor', 'error');
+      }
+    }
+
+    // Patients
+    async function loadPatients() {
+      try {
+        const res = await fetch(base + '/api/patients');
+        const data = await res.json();
+        displayPatients(data);
+        updatePatientSelect(data);
+      } catch (error) {
+        document.getElementById('patientsContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading patients</div></div>';
+        showToast('Error loading patients', 'error');
+      }
+    }
+
+    function displayPatients(patients) {
+      const container = document.getElementById('patientsContainer');
+      const table = document.getElementById('patTable');
+      const emptyState = document.getElementById('emptyPatients');
+      const tbody = table.querySelector('tbody');
+
+      if (!patients || patients.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = patients.map(p => `
+        <tr>
+          <td><strong>#${p.PatientID}</strong></td>
+          <td><strong>${escapeHtml(p.Name)}</strong></td>
+          <td>${p.Age || 'N/A'}</td>
+          <td>${escapeHtml(p.Contact || 'N/A')}</td>
+          <td>${escapeHtml(p.Address || 'N/A')}</td>
+          <td>
+            <div class="table-actions">
+              <button onclick="editPatient(${p.PatientID}, '${escapeHtml(p.Name)}', ${p.Age || 0}, '${p.Contact || ''}', '${escapeHtml(p.Address || '')}')" class="btn-sm btn-secondary">Edit</button>
+              <button onclick="deletePatient(${p.PatientID})" class="btn-sm btn-danger">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updatePatientSelect(patients) {
+      const select = document.getElementById('selPatient');
+      select.innerHTML = '<option value="">-- Select Patient --</option>' + 
+        patients.map(p => `<option value="${p.PatientID}">${p.Name}${p.Age ? ' (Age: ' + p.Age + ')' : ''}</option>`).join('');
+    }
+
+    async function addPatient() {
+      const form = document.getElementById('addPatientForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const formData = {
+        Name: document.getElementById('patName').value.trim(),
+        Age: parseInt(document.getElementById('patAge').value || 0),
+        Contact: document.getElementById('patContact').value.trim(),
+        Address: document.getElementById('patAddress').value.trim()
+      };
+
+      const validation = validateForm(formData, ['Name']);
+      if (!validation.isValid) {
+        showToast(validation.errors[0], 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/patients', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(formData)
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Patient added successfully', 'success');
+          form.reset();
+          loadPatients();
+        }
+      } catch (error) {
+        showToast('Error adding patient', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function editPatient(id, name, age, contact, address) {
+      const newName = prompt('Name', name);
+      if (!newName) return;
+
+      const newAge = parseInt(prompt('Age', age) || 0);
+      const newContact = prompt('Contact', contact || '') || '';
+      const newAddress = prompt('Address', address || '') || '';
+
+      if (!confirm('Save changes?')) return;
+      updatePatient(id, newName, newAge, newContact, newAddress);
+    }
+
+    async function updatePatient(id, Name, Age, Contact, Address) {
+      try {
+        const res = await fetch(base + '/api/patients/' + id, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ Name, Age, Contact, Address })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Patient updated successfully', 'success');
+          loadPatients();
+        }
+      } catch (error) {
+        showToast('Error updating patient', 'error');
+      }
+    }
+
+    async function deletePatient(id) {
+      if (!confirm('Delete patient? This action cannot be undone.')) return;
+
+      try {
+        const res = await fetch(base + '/api/patients/' + id, {
+          method: 'DELETE'
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Patient deleted successfully', 'success');
+          loadPatients();
+        }
+      } catch (error) {
+        showToast('Error deleting patient', 'error');
+      }
+    }
+
+    // Consultations
+    async function loadConsultations() {
+      try {
+        const res = await fetch(base + '/api/consultations');
+        const data = await res.json();
+        displayConsultations(data);
+      } catch (error) {
+        document.getElementById('consultationsContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading consultations</div></div>';
+        showToast('Error loading consultations', 'error');
+      }
+    }
+
+    function displayConsultations(consultations) {
+      const container = document.getElementById('consultationsContainer');
+      const table = document.getElementById('consTable');
+      const emptyState = document.getElementById('emptyConsultations');
+      const tbody = table.querySelector('tbody');
+
+      if (!consultations || consultations.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = consultations.map(c => `
+        <tr>
+          <td><strong>#${c.ConsultationID}</strong></td>
+          <td>${c.Date ? formatDate(c.Date) : 'N/A'}</td>
+          <td><strong>${escapeHtml(c.DoctorName || 'Unknown')}</strong></td>
+          <td><strong>${escapeHtml(c.PatientName || 'Unknown')}</strong></td>
+          <td>${escapeHtml(c.Diagnosis || 'N/A')}</td>
+          <td>
+            <div class="table-actions">
+              <button onclick="editConsultation(${c.ConsultationID})" class="btn-sm btn-secondary">Edit</button>
+              <button onclick="deleteConsultation(${c.ConsultationID})" class="btn-sm btn-danger">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function addConsultation() {
+      const form = document.getElementById('addConsultationForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const DoctorID = document.getElementById('selDoctor').value;
+      const PatientID = document.getElementById('selPatient').value;
+      const Date = document.getElementById('consDate').value;
+      const Diagnosis = document.getElementById('consDiag').value.trim();
+
+      if (!DoctorID || !PatientID) {
+        showToast('Please select doctor and patient', 'warning');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/consultations', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ DoctorID, PatientID, Date, Diagnosis })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Consultation added successfully', 'success');
+          form.reset();
+          document.getElementById('consDate').valueAsDate = new Date();
+          loadConsultations();
+        }
+      } catch (error) {
+        showToast('Error adding consultation', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function editConsultation(id) {
+      const DoctorID = prompt('Doctor ID') || '';
+      const PatientID = prompt('Patient ID') || '';
+      const Date = prompt('Date (YYYY-MM-DD)') || '';
+      const Diagnosis = prompt('Diagnosis') || '';
+
+      if (!DoctorID || !PatientID) {
+        showToast('Doctor ID and Patient ID required', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/consultations/' + id, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ DoctorID: parseInt(DoctorID), PatientID: parseInt(PatientID), Date, Diagnosis })
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Consultation updated successfully', 'success');
+          loadConsultations();
+        }
+      } catch (error) {
+        showToast('Error updating consultation', 'error');
+      }
+    }
+
+    async function deleteConsultation(id) {
+      if (!confirm('Delete consultation? This action cannot be undone.')) return;
+
+      try {
+        const res = await fetch(base + '/api/consultations/' + id, {
+          method: 'DELETE'
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Consultation deleted successfully', 'success');
+          loadConsultations();
+        }
+      } catch (error) {
+        showToast('Error deleting consultation', 'error');
+      }
+    }
+
+    // Initialize
+    loadDoctors();
+    loadPatients();
+    loadConsultations();
+  </script>
+</body>
+</html>

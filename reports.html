@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports & Analytics</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-reports">
+  <header>
+    <h1>📊 Reports & Analytics</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>📅 Date Range Filter</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="reportStartDate">
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="reportEndDate">
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+          <button onclick="applyDateFilter()">Apply Filter</button>
+          <button onclick="clearDateFilter()" class="btn-secondary">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="totalRevenue">₹0</div>
+        <div class="stat-label">Total Revenue</div>
+      </div>
+      <div class="stat-card secondary">
+        <div class="stat-value" id="totalSales">0</div>
+        <div class="stat-label">Total Sales</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-value" id="totalCustomers">0</div>
+        <div class="stat-label">Active Customers</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-value" id="avgSale">₹0</div>
+        <div class="stat-label">Average Sale</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Sales Report (Daily)</h2>
+      <div id="salesReportContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading sales report...</span>
+        </div>
+      </div>
+      <table id="salesReportTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Total Purchases</th>
+            <th>Total Quantity</th>
+            <th>Revenue</th>
+            <th>Unique Buyers</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="emptySalesReport" class="empty-state hidden">
+        <div class="empty-state-icon">📊</div>
+        <div class="empty-state-text">No sales data available</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🏆 Top Selling Medicines</h2>
+      <div class="form-group">
+        <label>Number of Items</label>
+        <select id="topMedicineLimit" onchange="loadTopMedicines()">
+          <option value="5">Top 5</option>
+          <option value="10" selected>Top 10</option>
+          <option value="20">Top 20</option>
+          <option value="50">Top 50</option>
+        </select>
+      </div>
+      <div id="topMedicinesContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading top medicines...</span>
+        </div>
+      </div>
+      <table id="topMedicinesTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Medicine Name</th>
+            <th>Unit Price</th>
+            <th>Total Sold</th>
+            <th>Revenue</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="emptyTopMedicines" class="empty-state hidden">
+        <div class="empty-state-icon">💊</div>
+        <div class="empty-state-text">No sales data available</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>👥 Buyer Statistics</h2>
+      <div id="buyerStatsContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading buyer statistics...</span>
+        </div>
+      </div>
+      <table id="buyerStatsTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Buyer Name</th>
+            <th>Contact</th>
+            <th>Total Purchases</th>
+            <th>Total Items</th>
+            <th>Total Spent</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="emptyBuyerStats" class="empty-state hidden">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-text">No buyer data available</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+    let dateFilter = { startDate: null, endDate: null };
+
+    function applyDateFilter() {
+      dateFilter.startDate = document.getElementById('reportStartDate').value || null;
+      dateFilter.endDate = document.getElementById('reportEndDate').value || null;
+      loadAllReports();
+    }
+
+    function clearDateFilter() {
+      document.getElementById('reportStartDate').value = '';
+      document.getElementById('reportEndDate').value = '';
+      dateFilter = { startDate: null, endDate: null };
+      loadAllReports();
+    }
+
+    async function loadAllReports() {
+      await Promise.all([
+        loadSalesReport(),
+        loadTopMedicines(),
+        loadBuyerStats()
+      ]);
+      calculateSummaryStats();
+    }
+
+    async function loadSalesReport() {
+      try {
+        let url = base + '/api/reports/sales';
+        const params = [];
+        if (dateFilter.startDate) params.push(`startDate=${dateFilter.startDate}`);
+        if (dateFilter.endDate) params.push(`endDate=${dateFilter.endDate}`);
+        if (params.length > 0) url += '?' + params.join('&');
+
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        displaySalesReport(data || []);
+      } catch (error) {
+        console.error('Error loading sales report:', error);
+        const container = document.getElementById('salesReportContainer');
+        container.innerHTML = 
+          '<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">Error loading sales report. Please check if the server is running.</div></div>';
+        showToast('Error loading sales report: ' + error.message, 'error');
+      }
+    }
+
+    function displaySalesReport(data) {
+      const container = document.getElementById('salesReportContainer');
+      const table = document.getElementById('salesReportTable');
+      const emptyState = document.getElementById('emptySalesReport');
+      const tbody = table.querySelector('tbody');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = data.map(row => `
+        <tr>
+          <td><strong>${formatDate(row.SaleDate)}</strong></td>
+          <td><span class="badge badge-info">${row.TotalPurchases}</span></td>
+          <td>${row.TotalQuantity}</td>
+          <td><strong>₹${parseFloat(row.TotalRevenue || 0).toFixed(2)}</strong></td>
+          <td>${row.UniqueBuyers}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadTopMedicines() {
+      try {
+        const limit = document.getElementById('topMedicineLimit').value;
+        const res = await fetch(base + '/api/reports/top-medicines?limit=' + limit);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        displayTopMedicines(data || []);
+      } catch (error) {
+        console.error('Error loading top medicines:', error);
+        const container = document.getElementById('topMedicinesContainer');
+        container.innerHTML = 
+          '<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">Error loading top medicines</div></div>';
+        showToast('Error loading top medicines: ' + error.message, 'error');
+      }
+    }
+
+    function displayTopMedicines(data) {
+      const container = document.getElementById('topMedicinesContainer');
+      const table = document.getElementById('topMedicinesTable');
+      const emptyState = document.getElementById('emptyTopMedicines');
+      const tbody = table.querySelector('tbody');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = data.map((row, index) => `
+        <tr>
+          <td><span class="badge ${index === 0 ? 'badge-warning' : 'badge-info'}">#${index + 1}</span></td>
+          <td><strong>${escapeHtml(row.ItemName)}</strong></td>
+          <td>₹${parseFloat(row.Price || 0).toFixed(2)}</td>
+          <td><span class="badge badge-success">${row.TotalSold}</span></td>
+          <td><strong>₹${parseFloat(row.TotalRevenue || 0).toFixed(2)}</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadBuyerStats() {
+      try {
+        const res = await fetch(base + '/api/reports/buyer-stats');
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        displayBuyerStats(data || []);
+      } catch (error) {
+        console.error('Error loading buyer statistics:', error);
+        const container = document.getElementById('buyerStatsContainer');
+        container.innerHTML = 
+          '<div class="empty-state"><div class="empty-state-icon">❌</div><div class="empty-state-text">Error loading buyer statistics</div></div>';
+        showToast('Error loading buyer statistics: ' + error.message, 'error');
+      }
+    }
+
+    function displayBuyerStats(data) {
+      const container = document.getElementById('buyerStatsContainer');
+      const table = document.getElementById('buyerStatsTable');
+      const emptyState = document.getElementById('emptyBuyerStats');
+      const tbody = table.querySelector('tbody');
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = data.map(row => `
+        <tr>
+          <td><strong>${escapeHtml(row.BuyerName)}</strong></td>
+          <td>${escapeHtml(row.Phone || 'N/A')}</td>
+          <td><span class="badge badge-info">${row.TotalPurchases}</span></td>
+          <td>${row.TotalItems}</td>
+          <td><strong>₹${parseFloat(row.TotalSpent || 0).toFixed(2)}</strong></td>
+          <td>
+            <button onclick="viewBuyerHistory(${row.BuyerID})" class="btn-sm btn-secondary">View History</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function calculateSummaryStats() {
+      try {
+        let url = base + '/api/reports/sales';
+        const params = [];
+        if (dateFilter.startDate) params.push(`startDate=${dateFilter.startDate}`);
+        if (dateFilter.endDate) params.push(`endDate=${dateFilter.endDate}`);
+        if (params.length > 0) url += '?' + params.join('&');
+
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const salesData = await res.json() || [];
+
+        const totalRevenue = salesData.reduce((sum, row) => sum + parseFloat(row.TotalRevenue || 0), 0);
+        const totalSales = salesData.reduce((sum, row) => sum + parseInt(row.TotalPurchases || 0), 0);
+
+        const buyerStatsRes = await fetch(base + '/api/reports/buyer-stats');
+        if (!buyerStatsRes.ok) {
+          throw new Error(`HTTP error! status: ${buyerStatsRes.status}`);
+        }
+        const buyerStats = await buyerStatsRes.json() || [];
+
+        document.getElementById('totalRevenue').textContent = `₹${totalRevenue.toFixed(2)}`;
+        document.getElementById('totalSales').textContent = totalSales;
+        document.getElementById('totalCustomers').textContent = buyerStats.length;
+        document.getElementById('avgSale').textContent = totalSales > 0 ? `₹${(totalRevenue / totalSales).toFixed(2)}` : '₹0';
+      } catch (error) {
+        console.error('Error calculating summary stats:', error);
+        showToast('Error loading summary statistics: ' + error.message, 'error');
+      }
+    }
+
+    function viewBuyerHistory(buyerId) {
+      window.location.href = `purchase.html?buyerId=${buyerId}`;
+    }
+
+    // Initialize page
+    function initPage() {
+      loadAllReports();
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initPage);
+    } else {
+      initPage();
+    }
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medicine - Owner Access</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-medicine">
+  <header>
+    <h1>💊 Medicine - Owner Access</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>🔐 Owner Authentication</h2>
+      <div class="form-group">
+        <label>Owner Password</label>
+        <input id="ownerPwd" type="password" placeholder="Enter owner password" autocomplete="current-password">
+      </div>
+      <button onclick="ownerLogin()">Login</button>
+    </div>
+
+    <div id="ownerArea" class="hidden">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">💊 Medicine Inventory</h2>
+          <button onclick="refreshMedicines()" class="btn-sm">🔄 Refresh</button>
+        </div>
+        
+        <div class="search-box">
+          <input type="text" id="searchMedicine" placeholder="Search medicines by name or type..." onkeyup="filterMedicines()">
+        </div>
+
+        <div id="medicinesContainer">
+          <div class="loading">
+            <div class="spinner"></div>
+            <span>Loading medicines...</span>
+          </div>
+        </div>
+
+        <table id="medTable" class="hidden">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Expiry</th>
+              <th>Stock</th>
+              <th>Reorder Level</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div id="emptyMedicines" class="empty-state hidden">
+          <div class="empty-state-icon">💊</div>
+          <div class="empty-state-text">No medicines found</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>➕ Add New Medicine</h2>
+        <form id="addMedicineForm" onsubmit="event.preventDefault(); addMedicine();">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Name *</label>
+              <input id="mName" placeholder="Medicine name" required>
+            </div>
+            <div class="form-group">
+              <label>Type</label>
+              <input id="mType" placeholder="e.g., Tablet, Capsule">
+            </div>
+            <div class="form-group">
+              <label>Price (₹) *</label>
+              <input id="mPrice" type="number" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Expiry Date</label>
+              <input id="mExpiry" type="date">
+            </div>
+            <div class="form-group">
+              <label>Stock Quantity *</label>
+              <input id="mStock" type="number" min="0" placeholder="0" required>
+            </div>
+            <div class="form-group">
+              <label>Reorder Level</label>
+              <input id="mReorderLevel" type="number" min="0" placeholder="10">
+            </div>
+          </div>
+
+          <button type="submit">Add Medicine</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+    let ownerPassword = null;
+    let allMedicines = [];
+
+    async function ownerLogin() {
+      const pwdInput = document.getElementById('ownerPwd');
+      const pwd = pwdInput.value.trim();
+      
+      if (!pwd) {
+        showToast('Please enter password', 'warning');
+        return;
+      }
+
+      const btn = event.target;
+      setLoading(btn, true);
+
+      // Simple authentication check - you can enhance this with actual API call
+      ownerPassword = pwd;
+      document.getElementById('ownerArea').classList.remove('hidden');
+      pwdInput.value = '';
+      showToast('Logged in successfully', 'success');
+      
+      await loadMedicines();
+      setLoading(btn, false);
+    }
+
+    async function loadMedicines() {
+      try {
+        const res = await fetch(base + '/api/medicines');
+        allMedicines = await res.json();
+        displayMedicines(allMedicines);
+      } catch (error) {
+        document.getElementById('medicinesContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading medicines</div></div>';
+        showToast('Error loading medicines', 'error');
+      }
+    }
+
+    function displayMedicines(medicines) {
+      const container = document.getElementById('medicinesContainer');
+      const table = document.getElementById('medTable');
+      const emptyState = document.getElementById('emptyMedicines');
+      const tbody = table.querySelector('tbody');
+
+      if (!medicines || medicines.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      tbody.innerHTML = medicines.map(m => {
+        const isLowStock = m.StockQty <= (m.ReorderLevel || 10);
+        const stockBadge = isLowStock ? 
+          `<span class="badge badge-warning">${m.StockQty}</span>` : 
+          `<span class="badge badge-success">${m.StockQty}</span>`;
+        
+        const expiryDate = m.ExpiryDate ? new Date(m.ExpiryDate).toLocaleDateString() : 'N/A';
+        const isExpired = m.ExpiryDate && new Date(m.ExpiryDate) < new Date();
+
+        return `
+          <tr>
+            <td><strong>#${m.ItemID}</strong></td>
+            <td><strong>${escapeHtml(m.Name)}</strong></td>
+            <td>${escapeHtml(m.Type || 'N/A')}</td>
+            <td>₹${parseFloat(m.Price || 0).toFixed(2)}</td>
+            <td>${isExpired ? `<span class="badge badge-danger">${expiryDate}</span>` : expiryDate}</td>
+            <td>${stockBadge}</td>
+            <td>${m.ReorderLevel || 10}</td>
+            <td>
+              <div class="table-actions">
+                <button onclick="updateStock(${m.ItemID}, ${m.StockQty})" class="btn-sm">Update Stock</button>
+                <button onclick="editMedicine(${m.ItemID})" class="btn-sm btn-secondary">Edit</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterMedicines() {
+      const searchTerm = document.getElementById('searchMedicine').value.toLowerCase();
+      const filtered = allMedicines.filter(m => 
+        m.Name.toLowerCase().includes(searchTerm) || 
+        (m.Type && m.Type.toLowerCase().includes(searchTerm))
+      );
+      displayMedicines(filtered);
+    }
+
+    async function updateStock(id, currentStock) {
+      const newStock = prompt('Enter new stock value', String(currentStock));
+      if (newStock === null || newStock === '') return;
+      
+      const stockValue = parseInt(newStock);
+      if (isNaN(stockValue) || stockValue < 0) {
+        showToast('Invalid stock value', 'error');
+        return;
+      }
+
+      if (!ownerPassword) {
+        showToast('Login required', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${base}/api/medicines/${id}/stock`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ StockQty: stockValue, password: ownerPassword })
+        });
+        
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Stock updated successfully', 'success');
+          loadMedicines();
+        }
+      } catch (error) {
+        showToast('Error updating stock', 'error');
+      }
+    }
+
+    async function editMedicine(id) {
+      const medicine = allMedicines.find(m => m.ItemID === id);
+      if (!medicine) return;
+
+      const newName = prompt('Name', medicine.Name);
+      if (!newName) return;
+
+      const newPrice = prompt('Price', medicine.Price);
+      if (!newPrice) return;
+
+      showToast('Edit functionality coming soon', 'info');
+    }
+
+    async function addMedicine() {
+      if (!ownerPassword) {
+        showToast('Login required', 'warning');
+        return;
+      }
+
+      const form = document.getElementById('addMedicineForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const formData = {
+        Name: document.getElementById('mName').value.trim(),
+        Type: document.getElementById('mType').value.trim(),
+        Price: parseFloat(document.getElementById('mPrice').value || 0),
+        ExpiryDate: document.getElementById('mExpiry').value || null,
+        StockQty: parseInt(document.getElementById('mStock').value || 0),
+        ReorderLevel: parseInt(document.getElementById('mReorderLevel').value || 10),
+        password: ownerPassword
+      };
+
+      const validation = validateForm(formData, ['Name', 'Price']);
+      if (!validation.isValid) {
+        showToast(validation.errors[0], 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        const res = await fetch(base + '/api/medicines', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(formData)
+        });
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Medicine added successfully', 'success');
+          form.reset();
+          loadMedicines();
+        }
+      } catch (error) {
+        showToast('Error adding medicine', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function refreshMedicines() {
+      await loadMedicines();
+      showToast('Medicines refreshed', 'success');
+    }
+  </script>
+</body>
+</html>

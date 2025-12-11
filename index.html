@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medical Shop Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+
+<body class="page-dashboard">
+  <header>
+     <div class="logo-title">
+    <img src="images/logo_circle.png" alt="MediStore Manager Logo" class="logo-img">
+    <h1>MediStore Manager</h1>
+  </div>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <h2>Dashboard Overview</h2>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-value" id="totalMedicines">-</div>
+        <div class="stat-label">Total Medicines</div>
+      </div>
+      <div class="stat-card secondary">
+        <div class="stat-value" id="lowStockCount">-</div>
+        <div class="stat-label">Low Stock Items</div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-value" id="totalPurchases">-</div>
+        <div class="stat-label">Total Purchases</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-value" id="todayPurchases">-</div>
+        <div class="stat-label">Today's Purchases</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">⚠️ Low Stock Items</h3>
+        <span class="badge badge-warning" id="lowStockBadge">0</span>
+      </div>
+      <div id="lowStockContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+      <ul id="lowStock" class="hidden"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">📋 Recent Purchases</h3>
+      </div>
+      <div id="purchasesContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+      <table id="recentPurchases" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Buyer</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="emptyPurchases" class="empty-state hidden">
+        <div class="empty-state-icon">📦</div>
+        <div class="empty-state-text">No purchases yet</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+
+    async function loadStats() {
+      try {
+        const [meds, purchases] = await Promise.all([
+          fetch(base + '/api/medicines').then(r => r.json()),
+          fetch(base + '/api/purchases').then(r => r.json())
+        ]);
+
+        const lowStock = meds.filter(m => m.StockQty <= (m.ReorderLevel || 10));
+        const today = new Date().toDateString();
+        const todayPurchases = purchases.filter(p => new Date(p.PurchaseDate).toDateString() === today);
+
+        document.getElementById('totalMedicines').textContent = meds.length;
+        document.getElementById('lowStockCount').textContent = lowStock.length;
+        document.getElementById('totalPurchases').textContent = purchases.length;
+        document.getElementById('todayPurchases').textContent = todayPurchases.length;
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    async function loadLowStock() {
+      try {
+        const res = await fetch(base + '/api/medicines/lowstock');
+        const data = await res.json();
+        const container = document.getElementById('lowStockContainer');
+        const list = document.getElementById('lowStock');
+        const badge = document.getElementById('lowStockBadge');
+
+        if (!data || data.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">All items are well stocked</div></div>';
+          list.classList.add('hidden');
+          badge.textContent = '0';
+          return;
+        }
+
+        container.innerHTML = '';
+        list.classList.remove('hidden');
+        badge.textContent = data.length;
+        list.innerHTML = data.map(i => `
+          <li>
+            <strong>${escapeHtml(i.Name)}</strong> — 
+            Stock: <span class="badge badge-warning">${i.StockQty}</span> | 
+            Reorder at: ${i.ReorderLevel || 10}
+          </li>
+        `).join('');
+      } catch (error) {
+        document.getElementById('lowStockContainer').innerHTML =
+          '<div class="empty-state"><div class="empty-state-text">Error loading low stock items</div></div>';
+        showToast('Error loading low stock items', 'error');
+      }
+    }
+
+    async function loadRecentPurchases() {
+      try {
+        const res = await fetch(base + '/api/purchases');
+        const data = await res.json();
+        const container = document.getElementById('purchasesContainer');
+        const table = document.getElementById('recentPurchases');
+        const emptyState = document.getElementById('emptyPurchases');
+        const tbody = table.querySelector('tbody');
+
+        if (!data || data.length === 0) {
+          container.innerHTML = '';
+          table.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        container.innerHTML = '';
+        table.classList.remove('hidden');
+        emptyState.classList.add('hidden');
+
+        tbody.innerHTML = data.slice(0, 10).map(p => `
+          <tr>
+            <td><strong>#${p.PurchaseID}</strong></td>
+            <td>${escapeHtml(p.BuyerName || 'Unknown')}</td>
+            <td>${escapeHtml(p.ItemName || 'Unknown')}</td>
+            <td><span class="badge badge-info">${p.Quantity}</span></td>
+            <td>${formatDate(p.PurchaseDate)}</td>
+          </tr>
+        `).join('');
+      } catch (error) {
+        document.getElementById('purchasesContainer').innerHTML =
+          '<div class="empty-state"><div class="empty-state-text">Error loading purchases</div></div>';
+        showToast('Error loading recent purchases', 'error');
+      }
+    }
+
+    // Initialize
+    loadStats();
+    loadLowStock();
+    loadRecentPurchases();
+
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+      loadStats();
+      loadLowStock();
+      loadRecentPurchases();
+    }, 30000);
+  </script>
+</body>
+
+</html>

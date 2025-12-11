@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purchases</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="images/logo_circle.png">
+
+</head>
+<body class="page-purchase">
+  <header>
+    <h1>🛒 Purchases Management</h1>
+    <nav>
+      <a href="index.html">🏠 Home</a>
+      <a href="medicine.html">💊 Medicine (Owner)</a>
+      <a href="buyer.html">👥 Buyers</a>
+      <a href="purchase.html">🛒 Purchases</a>
+      <a href="supplier.html">🚚 Suppliers</a>
+      <a href="consultation.html">🩺 Consultations</a>
+      <a href="billing.html">💳 Billing</a>
+      <a href="reports.html">📊 Reports</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2>🛒 Record New Purchase</h2>
+      <form id="purchaseForm" onsubmit="event.preventDefault(); addPurchase();">
+        <div class="form-group">
+          <label>Buyer Type</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="buyerType" value="existing" checked onchange="toggleBuyerType()">
+              Existing Buyer
+            </label>
+            <label>
+              <input type="radio" name="buyerType" value="new" onchange="toggleBuyerType()">
+              New Buyer
+            </label>
+          </div>
+        </div>
+
+        <div id="existingDiv">
+          <div class="form-group">
+            <label>Select Buyer *</label>
+            <select id="buyerSelect" required></select>
+          </div>
+        </div>
+
+        <div id="newDiv" class="hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Buyer Name *</label>
+              <input id="newBuyerName" placeholder="Full name">
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input id="newBuyerPhone" type="tel" placeholder="Phone number">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <textarea id="newBuyerAddress" placeholder="Complete address" rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Medicine *</label>
+            <select id="medicineSelect" required></select>
+          </div>
+          <div class="form-group">
+            <label>Quantity *</label>
+            <input id="qty" type="number" value="1" min="1" required>
+          </div>
+        </div>
+
+        <button type="submit">Add Purchase</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📋 Purchase History</h2>
+        <button onclick="loadPurchases()" class="btn-sm">🔄 Refresh</button>
+      </div>
+
+      <div class="form-row" style="margin-bottom: 1rem;">
+        <div class="form-group">
+          <label>Filter by Buyer</label>
+          <select id="historyBuyerFilter" onchange="applyFilters()">
+            <option value="">All Buyers</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="historyStartDate" onchange="applyFilters()">
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="date" id="historyEndDate" onchange="applyFilters()">
+        </div>
+        <div class="form-group" style="display: flex; align-items: flex-end;">
+          <button onclick="clearFilters()" class="btn-secondary">Clear Filters</button>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <input type="text" id="searchPurchase" placeholder="Search purchases by buyer or item..." onkeyup="filterPurchases()">
+      </div>
+
+      <div id="purchasesContainer">
+        <div class="loading">
+          <div class="spinner"></div>
+          <span>Loading purchases...</span>
+        </div>
+      </div>
+
+      <table id="purchasesTable" class="hidden">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Buyer</th>
+            <th>Item</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot id="purchaseSummary" class="hidden">
+          <tr>
+            <td colspan="4" class="text-right"><strong>Total:</strong></td>
+            <td colspan="4"><strong id="totalAmount">₹0.00</strong></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div id="emptyPurchases" class="empty-state hidden">
+        <div class="empty-state-icon">🛒</div>
+        <div class="empty-state-text">No purchases found</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="utils.js"></script>
+  <script>
+    const base = 'http://localhost:5000';
+    let allPurchases = [];
+    let allMedicines = [];
+
+    function toggleBuyerType() {
+      const buyerType = document.querySelector('input[name="buyerType"]:checked').value;
+      const existingDiv = document.getElementById('existingDiv');
+      const newDiv = document.getElementById('newDiv');
+      
+      if (buyerType === 'new') {
+        existingDiv.classList.add('hidden');
+        newDiv.classList.remove('hidden');
+        document.getElementById('buyerSelect').required = false;
+        document.getElementById('newBuyerName').required = true;
+      } else {
+        existingDiv.classList.remove('hidden');
+        newDiv.classList.add('hidden');
+        document.getElementById('buyerSelect').required = true;
+        document.getElementById('newBuyerName').required = false;
+      }
+    }
+
+    async function loadOptions() {
+      try {
+        const [buyers, meds] = await Promise.all([
+          fetch(base + '/api/buyers').then(r => r.json()),
+          fetch(base + '/api/medicines').then(r => r.json())
+        ]);
+
+        allMedicines = meds;
+        
+        const buyerOptions = buyers.map(b => 
+          `<option value="${b.BuyerID}">${b.Name}${b.Phone ? ' (' + b.Phone + ')' : ''}</option>`
+        ).join('');
+
+        document.getElementById('buyerSelect').innerHTML = buyerOptions;
+        document.getElementById('historyBuyerFilter').innerHTML = '<option value="">All Buyers</option>' + buyerOptions;
+        
+        document.getElementById('medicineSelect').innerHTML = meds.map(m => {
+          const stockStatus = m.StockQty > 0 ? 
+            `<span class="badge badge-success">Stock: ${m.StockQty}</span>` : 
+            `<span class="badge badge-danger">Out of Stock</span>`;
+          return `<option value="${m.ItemID}">${m.Name} - ₹${parseFloat(m.Price || 0).toFixed(2)} - ${stockStatus}</option>`;
+        }).join('');
+      } catch (error) {
+        showToast('Error loading options', 'error');
+      }
+    }
+
+    async function applyFilters() {
+      const buyerId = document.getElementById('historyBuyerFilter').value;
+      const startDate = document.getElementById('historyStartDate').value;
+      const endDate = document.getElementById('historyEndDate').value;
+
+      let url = base + '/api/purchases?';
+      const params = [];
+      if (buyerId) params.push(`buyerId=${buyerId}`);
+      if (startDate) params.push(`startDate=${startDate}`);
+      if (endDate) params.push(`endDate=${endDate}`);
+      
+      url += params.join('&');
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        allPurchases = data;
+        displayPurchases(data);
+      } catch (error) {
+        showToast('Error filtering purchases', 'error');
+      }
+    }
+
+    function clearFilters() {
+      document.getElementById('historyBuyerFilter').value = '';
+      document.getElementById('historyStartDate').value = '';
+      document.getElementById('historyEndDate').value = '';
+      loadPurchases();
+    }
+
+    function generateBill(purchaseId) {
+      window.location.href = `billing.html?purchaseId=${purchaseId}`;
+    }
+
+    // Check for URL parameters (e.g., from buyer history)
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const buyerId = urlParams.get('buyerId');
+      if (buyerId) {
+        document.getElementById('historyBuyerFilter').value = buyerId;
+        applyFilters();
+      }
+    });
+
+    async function loadPurchases() {
+      try {
+        const res = await fetch(base + '/api/purchases');
+        allPurchases = await res.json();
+        displayPurchases(allPurchases);
+      } catch (error) {
+        document.getElementById('purchasesContainer').innerHTML = 
+          '<div class="empty-state"><div class="empty-state-text">Error loading purchases</div></div>';
+        showToast('Error loading purchases', 'error');
+      }
+    }
+
+    function displayPurchases(purchases) {
+      const container = document.getElementById('purchasesContainer');
+      const table = document.getElementById('purchasesTable');
+      const emptyState = document.getElementById('emptyPurchases');
+      const tbody = table.querySelector('tbody');
+
+      if (!purchases || purchases.length === 0) {
+        container.innerHTML = '';
+        table.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      container.innerHTML = '';
+      table.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      const total = purchases.reduce((sum, p) => sum + parseFloat(p.TotalAmount || (p.Price || 0) * p.Quantity || 0), 0);
+      
+      tbody.innerHTML = purchases.map(p => {
+        const price = parseFloat(p.Price || 0);
+        const qty = parseInt(p.Quantity || 0);
+        const total = price * qty;
+        return `
+          <tr>
+            <td><strong>#${p.PurchaseID}</strong></td>
+            <td><strong>${escapeHtml(p.BuyerName || 'Unknown')}</strong></td>
+            <td>${escapeHtml(p.ItemName || 'Unknown')}</td>
+            <td><span class="badge badge-info">${qty}</span></td>
+            <td>₹${price.toFixed(2)}</td>
+            <td><strong>₹${total.toFixed(2)}</strong></td>
+            <td>${formatDate(p.PurchaseDate)}</td>
+            <td>
+              <div class="table-actions">
+                <button onclick="generateBill(${p.PurchaseID})" class="btn-sm">💳 Bill</button>
+                <button onclick="viewPurchaseDetails(${p.PurchaseID})" class="btn-sm btn-secondary">Details</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Update summary
+      if (purchases.length > 0) {
+        document.getElementById('purchaseSummary').classList.remove('hidden');
+        document.getElementById('totalAmount').textContent = `₹${total.toFixed(2)}`;
+      } else {
+        document.getElementById('purchaseSummary').classList.add('hidden');
+      }
+    }
+
+    function filterPurchases() {
+      const searchTerm = document.getElementById('searchPurchase').value.toLowerCase();
+      const filtered = allPurchases.filter(p => 
+        (p.BuyerName && p.BuyerName.toLowerCase().includes(searchTerm)) ||
+        (p.ItemName && p.ItemName.toLowerCase().includes(searchTerm))
+      );
+      displayPurchases(filtered);
+    }
+
+    async function addPurchase() {
+      const form = document.getElementById('purchaseForm');
+      const btn = form.querySelector('button[type="submit"]');
+      setLoading(btn, true);
+
+      const buyerType = document.querySelector('input[name="buyerType"]:checked').value;
+      const ItemID = document.getElementById('medicineSelect').value;
+      const Quantity = parseInt(document.getElementById('qty').value);
+
+      if (!ItemID || Quantity < 1) {
+        showToast('Please select medicine and quantity', 'warning');
+        setLoading(btn, false);
+        return;
+      }
+
+      // Check stock availability
+      const selectedMedicine = allMedicines.find(m => m.ItemID == ItemID);
+      if (selectedMedicine && Quantity > selectedMedicine.StockQty) {
+        showToast(`Insufficient stock! Available: ${selectedMedicine.StockQty}`, 'error');
+        setLoading(btn, false);
+        return;
+      }
+
+      try {
+        let res;
+        if (buyerType === 'existing') {
+          const BuyerID = document.getElementById('buyerSelect').value;
+          res = await fetch(base + '/api/purchases', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ BuyerID, ItemID, Quantity })
+          });
+        } else {
+          const BuyerName = document.getElementById('newBuyerName').value.trim();
+          const BuyerPhone = document.getElementById('newBuyerPhone').value.trim();
+          const BuyerAddress = document.getElementById('newBuyerAddress').value.trim();
+          
+          if (!BuyerName) {
+            showToast('Buyer name required', 'error');
+            setLoading(btn, false);
+            return;
+          }
+
+          res = await fetch(base + '/api/purchases', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+              newBuyer: true, 
+              BuyerName, 
+              BuyerPhone, 
+              BuyerAddress, 
+              ItemID, 
+              Quantity 
+            })
+          });
+        }
+
+        const j = await res.json();
+        if (!res.ok) {
+          showToast('Error: ' + (j.error || 'unknown'), 'error');
+        } else {
+          showToast('Purchase recorded successfully', 'success');
+          form.reset();
+          toggleBuyerType();
+          loadOptions();
+          loadPurchases();
+        }
+      } catch (error) {
+        showToast('Error recording purchase', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function viewPurchaseDetails(purchaseId) {
+      try {
+        const res = await fetch(base + '/api/purchases/' + purchaseId);
+        const purchase = await res.json();
+        
+        const details = `
+Purchase Details:
+
+ID: #${purchase.PurchaseID}
+Date: ${formatDate(purchase.PurchaseDate)}
+Buyer: ${purchase.BuyerName || 'Unknown'}
+${purchase.BuyerPhone ? 'Phone: ' + purchase.BuyerPhone : ''}
+${purchase.BuyerAddress ? 'Address: ' + purchase.BuyerAddress : ''}
+
+Item: ${purchase.ItemName || 'Unknown'}
+Quantity: ${purchase.Quantity}
+Unit Price: ₹${parseFloat(purchase.Price || 0).toFixed(2)}
+Total Amount: ₹${parseFloat(purchase.TotalAmount || (purchase.Price || 0) * purchase.Quantity).toFixed(2)}
+        `;
+        alert(details);
+      } catch (error) {
+        showToast('Error loading purchase details', 'error');
+      }
+    }
+
+    // Initialize
+    loadOptions();
+    loadPurchases();
+    toggleBuyerType();
+  </script>
+</body>
+</html>
